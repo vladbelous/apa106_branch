@@ -94,7 +94,8 @@ void pushStrip(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t n) {
   //    R1 (assumed 0)
 
   asm volatile (
-      "and r18, r18       \n"
+      "mov r2, r18        \n"
+      "and r2, r2         \n"
       "breq L%=_exit      \n"
 
       "in r0, __SREG__    \n"
@@ -105,29 +106,20 @@ void pushStrip(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t n) {
       "movw r28, r22      \n"
       "movw r30, r20      \n"
 
-      // TODO: inside the loop it'd be more efficient to use
-      // a few movw's (1 cycle), instead of push's (2 cycles)...
-
      "L%=_next_rgb:       \n"
       "ld r24, X+         \n"
       "ld r22, Y+         \n"
       "ld r20, Z+         \n"
 
-      "push r18           \n"   // save n
-      "push r26           \n"   // save X
-      "push r27           \n"
-      "push r30           \n"   // save Z
-      "push r31           \n"
+      "movw r4, r26       \n"   // save X
+      "movw r6, r30       \n"   // save Z
 
       "call %x[f]         \n"
 
-      "pop r31            \n"   // restore Z
-      "pop r30            \n"
-      "pop r27            \n"   // restore X
-      "pop r26            \n"
-      "pop r18            \n"   // restore n
+      "movw r26, r4       \n"   // restore Z
+      "movw r30, r6       \n"   // restore X
 
-      "dec r18            \n"   // n -= 1
+      "dec r2             \n" // n -= 1
       "brne L%=_next_rgb  \n"
 
       // Must wait ~400 cycles for RESET code to APA106:
@@ -142,7 +134,8 @@ void pushStrip(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t n) {
      "L%=_exit:           \n"
       : 
       : [f] "s" (pushRGB<TTagPort, TBit>)
-      : "r28", "r29"
+      : "r28", "r29",
+        "r2", "r4", "r5", "r6", "r7"
   );
   // Re: undocumented %x[f] syntax:
   // www.avrfreaks.net/forum/inline-assembler-function-address-operand

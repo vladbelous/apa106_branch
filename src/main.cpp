@@ -125,9 +125,8 @@ void loop() {
         b[j] = ((val >> 7) & 255) / brAdj;
       }
       pushStrip<TagPORTB, 2>(r, g, b, 5);
-      delay(1);
+      delay(2);
     }
-    ++i;
     //delay(2000);
     sleep_2s(); // real low-power sleep
 
