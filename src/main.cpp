@@ -11,26 +11,42 @@
 using namespace apa106;
 
 /**
- * Based on "SecretVoltmeter.wiki"
- * ADMUX.REFS0     -> AVcc is reference
- * ADMUX.MUX[1110] -> measure internal 1.1V reference
+ * Measure internal Vbg "bandgap" reference voltage against AVcc,
+ * and workout AVcc from that.
+ *
+ *  ADMUX.REFS0     -> AVcc is reference
+ *  ADMUX.MUX[1110] -> measure internal 1.1V reference (Vbg)
+ *  ADMUX.MUX[1111] -> measure at pin to GND
  *
  * Interestingly:
  *    MUX[1000] would give internal temperature.
  */
 float readVcc() __attribute__((noinline));
 float readVcc() {
-  cli();
+  // Switching to Vbg and sampling immediately produces
+  // ADC counts skewed by the previous voltage in ADC.
+  // Proposed mitigation:
+  //    first switch to GND and skip one sample;
+  //    then switch to Vbg and skip first few sampels.
 
-  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-  delay(2);            // Wait for Vref to settle (?)
-  ADCSRA |= _BV(ADSC); // ADSC -> start conversion
+  // ADMUX -> GND, 1 sample:
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1) | _BV(MUX0);
+  ADCSRA |= _BV(ADSC);
   while (bit_is_set(ADCSRA, ADSC));
 
-  uint16_t result = ADCW;
-  sei();
+  // ADMUX -> Vbg, skip 8 samples;
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  for (uint8_t i = 0; i < 8; ++i) {
+    ADCSRA |= _BV(ADSC);
+    while (bit_is_set(ADCSRA, ADSC));
+  }
 
-  return (1.1 * 1024.0 * 0.9847) / result;
+  // Actual sample:
+  ADCSRA |= _BV(ADSC);
+  while (bit_is_set(ADCSRA, ADSC));
+  uint16_t result = ADCW;
+
+  return (1.1 * 1024.0 * 0.9847) / (result + 0.5);
 }
 
 
